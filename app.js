@@ -94,6 +94,13 @@ const state = {
   query: "",
   view: "all",
   user: null,
+  quiz: {
+    cards: [],
+    index: 0,
+    correct: 0,
+    language: "english",
+    locked: false,
+  },
 };
 
 const grid = document.querySelector("#cards-grid");
@@ -111,6 +118,13 @@ const imageInput = document.querySelector("#card-image");
 const imagePreview = document.querySelector("#image-preview");
 const formError = document.querySelector("#form-error");
 const saveCardButton = document.querySelector("#save-card-button");
+const librarySection = document.querySelector(".library");
+const welcomeSection = document.querySelector(".welcome");
+const quizPage = document.querySelector("#quiz-page");
+const quizLaunchButton = document.querySelector("#quiz-launch-button");
+const quizForm = document.querySelector("#quiz-form");
+const quizAnswer = document.querySelector("#quiz-answer");
+const quizFeedback = document.querySelector("#quiz-feedback");
 
 function escapeHtml(value) {
   const element = document.createElement("div");
@@ -220,6 +234,13 @@ function renderCards() {
     .join("");
 }
 
+function updateQuizButton() {
+  const learnedCount = state.cards.filter((card) => card.is_learned).length;
+  quizLaunchButton.hidden = state.view !== "learned";
+  quizLaunchButton.disabled = learnedCount === 0;
+  quizLaunchButton.title = learnedCount ? "" : "Спочатку позначте хоча б одну картку вивченою";
+}
+
 function updateProgress() {
   const learned = state.cards.filter((card) => card.is_learned).length;
   const percent = state.cards.length ? Math.round((learned / state.cards.length) * 100) : 0;
@@ -235,6 +256,109 @@ function render() {
   renderFilters();
   renderCards();
   updateProgress();
+  updateQuizButton();
+}
+
+function shuffleCards(cards) {
+  const shuffled = [...cards];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
+function normalizeAnswer(value) {
+  return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
+function updateQuizLanguage() {
+  const isEnglish = state.quiz.language === "english";
+  document.querySelector("#quiz-instruction").textContent =
+    `Напиши переклад ${isEnglish ? "англійською" : "іспанською"}.`;
+  document.querySelector("#quiz-answer-label").textContent =
+    `Твоя відповідь ${isEnglish ? "англійською" : "іспанською"}`;
+  document.querySelectorAll("[data-quiz-language]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.quizLanguage === state.quiz.language);
+  });
+}
+
+function closeQuiz() {
+  location.reload();
+}
+
+function renderQuizQuestion() {
+  const card = state.quiz.cards[state.quiz.index];
+  if (!card) {
+    document.querySelector("#quiz-shell").innerHTML = `
+      <div class="quiz-result">
+        <p class="section-kicker">QUIZ ЗАВЕРШЕНО</p>
+        <h2>Гарна робота!</h2>
+        <strong>${state.quiz.correct} / ${state.quiz.cards.length}</strong>
+        <p>Правильних відповідей</p>
+        <button class="primary-button" id="quiz-finish-button">Повернутися до карток</button>
+      </div>
+    `;
+    document.querySelector("#quiz-progress").textContent = "Готово";
+    document.querySelector("#quiz-finish-button").addEventListener("click", closeQuiz);
+    return;
+  }
+
+  state.quiz.locked = false;
+  quizFeedback.hidden = true;
+  quizFeedback.className = "quiz-feedback";
+  quizAnswer.value = "";
+  quizAnswer.disabled = false;
+  quizForm.querySelector("button").disabled = false;
+  document.querySelector("#quiz-progress").textContent =
+    `${state.quiz.index + 1} / ${state.quiz.cards.length}`;
+  document.querySelector("#quiz-category").textContent = card.category;
+  document.querySelector("#quiz-word").textContent = card.ukrainian;
+  updateQuizLanguage();
+  quizAnswer.focus();
+}
+
+function startQuiz() {
+  const learnedCards = state.cards.filter((card) => card.is_learned);
+  if (!learnedCards.length) {
+    showToast("Спочатку позначте картки вивченими");
+    return;
+  }
+
+  state.quiz.cards = shuffleCards(learnedCards);
+  state.quiz.index = 0;
+  state.quiz.correct = 0;
+  state.quiz.language = "english";
+  welcomeSection.hidden = true;
+  librarySection.hidden = true;
+  quizPage.hidden = false;
+  document.querySelector(".mobile-nav").hidden = true;
+  scrollTo({ top: 0, behavior: "smooth" });
+  renderQuizQuestion();
+}
+
+function checkQuizAnswer(event) {
+  event.preventDefault();
+  if (state.quiz.locked) return;
+
+  const card = state.quiz.cards[state.quiz.index];
+  const expected = card[state.quiz.language];
+  const isCorrect = normalizeAnswer(quizAnswer.value) === normalizeAnswer(expected);
+  state.quiz.locked = true;
+  if (isCorrect) state.quiz.correct += 1;
+
+  quizAnswer.disabled = true;
+  quizForm.querySelector("button").disabled = true;
+  quizFeedback.hidden = false;
+  quizFeedback.classList.add(isCorrect ? "correct" : "incorrect");
+  quizFeedback.textContent = isCorrect
+    ? "Правильно!"
+    : `Неправильно. Правильна відповідь: ${expected}`;
+
+  setTimeout(() => {
+    state.quiz.index += 1;
+    renderQuizQuestion();
+  }, 1100);
 }
 
 function renderUser() {
@@ -453,7 +577,19 @@ document.querySelectorAll("[data-view]").forEach((button) => {
       item.classList.toggle("active", item.dataset.view === state.view);
     });
     renderCards();
+    updateQuizButton();
   });
+});
+
+quizLaunchButton.addEventListener("click", startQuiz);
+document.querySelector("#quiz-back-button").addEventListener("click", closeQuiz);
+quizForm.addEventListener("submit", checkQuizAnswer);
+document.querySelector(".quiz-language-switch").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-quiz-language]");
+  if (!button || state.quiz.locked) return;
+  state.quiz.language = button.dataset.quizLanguage;
+  updateQuizLanguage();
+  quizAnswer.focus();
 });
 
 document.querySelector("#add-card-button").addEventListener("click", openCardModal);
