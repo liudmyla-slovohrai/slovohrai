@@ -127,6 +127,7 @@ const quizLaunchButton = document.querySelector("#quiz-launch-button");
 const quizForm = document.querySelector("#quiz-form");
 const quizAnswer = document.querySelector("#quiz-answer");
 const quizFeedback = document.querySelector("#quiz-feedback");
+let cardsLoadVersion = 0;
 
 function escapeHtml(value) {
   const element = document.createElement("div");
@@ -411,6 +412,9 @@ function renderUser() {
 }
 
 async function loadCards() {
+  const loadVersion = ++cardsLoadVersion;
+  const userId = state.user?.id || null;
+
   if (!db || !state.user) {
     state.cards = [...demoCards];
     render();
@@ -421,6 +425,8 @@ async function loadCards() {
     .from("cards")
     .select("*")
     .order("created_at", { ascending: false });
+
+  if (loadVersion !== cardsLoadVersion || state.user?.id !== userId) return;
 
   if (error) {
     showToast("Не вдалося завантажити картки");
@@ -868,9 +874,11 @@ async function initialize() {
   await loadCards();
 
   db.auth.onAuthStateChange(async (_event, session) => {
-    state.user = session?.user || null;
+    const nextUser = session?.user || null;
+    const userChanged = state.user?.id !== nextUser?.id;
+    state.user = nextUser;
     renderUser();
-    await loadCards();
+    if (userChanged) await loadCards();
   });
 }
 
