@@ -15,10 +15,10 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=5" />
+    <link rel="stylesheet" href="styles.css?v=6" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=5" defer></script>
+    <script src="app.js?v=6" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -160,8 +160,8 @@
       <form class="modal-card" id="card-form">
         <div class="modal-heading">
           <div>
-            <p class="section-kicker">НОВА КАРТКА</p>
-            <h2>Додати слово</h2>
+            <p class="section-kicker" id="card-modal-kicker">НОВА КАРТКА</p>
+            <h2 id="card-modal-title">Додати слово</h2>
           </div>
           <button class="modal-close" type="button" data-close-modal aria-label="Закрити">×</button>
         </div>
