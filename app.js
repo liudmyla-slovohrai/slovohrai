@@ -101,6 +101,7 @@ const state = {
     language: "english",
     locked: false,
   },
+  editingCardId: null,
 };
 
 const grid = document.querySelector("#cards-grid");
@@ -229,7 +230,11 @@ function renderCards() {
                   <button class="learn-button ${card.is_learned ? "active" : ""}" data-action="learned">
                     ${card.is_learned ? "✓ Вивчено" : "Позначити вивченим"}
                   </button>
-                  <button class="back-button" data-action="flip">↻ Назад</button>
+                  ${
+                    card.id.startsWith("demo-")
+                      ? `<button class="back-button" data-action="flip">↻ Назад</button>`
+                      : `<button class="edit-card-button" data-action="edit">✎ Редагувати</button>`
+                  }
                 </div>
               </div>
             </div>
@@ -459,16 +464,51 @@ function openCardModal() {
     if (isConfigured) signIn();
     return;
   }
+  state.editingCardId = null;
+  cardForm.reset();
+  imagePreview.removeAttribute("src");
+  imagePreview.hidden = true;
   formError.textContent = "";
+  document.querySelector("#card-modal-kicker").textContent = "НОВА КАРТКА";
+  document.querySelector("#card-modal-title").textContent = "Додати слово";
+  saveCardButton.textContent = "Створити картку";
   cardModal.showModal();
 }
 
-async function uploadImage(file, cardId) {
+function openEditModal(card) {
+  if (!state.user || card.id.startsWith("demo-")) return;
+
+  state.editingCardId = card.id;
+  cardForm.reset();
+  cardForm.elements.ukrainian.value = card.ukrainian || "";
+  cardForm.elements.english.value = card.english || "";
+  cardForm.elements.english_pronunciation.value = card.english_pronunciation || "";
+  cardForm.elements.spanish.value = card.spanish || "";
+  cardForm.elements.spanish_pronunciation.value = card.spanish_pronunciation || "";
+  cardForm.elements.category.value = card.category || "";
+  imageInput.value = "";
+
+  if (card.image_url) {
+    imagePreview.src = card.image_url;
+    imagePreview.hidden = false;
+  } else {
+    imagePreview.removeAttribute("src");
+    imagePreview.hidden = true;
+  }
+
+  formError.textContent = "";
+  document.querySelector("#card-modal-kicker").textContent = "РЕДАГУВАННЯ";
+  document.querySelector("#card-modal-title").textContent = `Картка «${card.ukrainian}»`;
+  saveCardButton.textContent = "Зберегти зміни";
+  cardModal.showModal();
+}
+
+async function uploadImage(file, cardId, suffix = "") {
   if (!file) return { image_url: null, image_path: null };
   if (file.size > 5 * 1024 * 1024) throw new Error("Картинка має бути меншою за 5 МБ");
 
   const extension = file.name.split(".").pop().toLowerCase();
-  const imagePath = `${state.user.id}/${cardId}.${extension}`;
+  const imagePath = `${state.user.id}/${cardId}${suffix}.${extension}`;
   const { error } = await db.storage.from("card-images").upload(imagePath, file, {
     cacheControl: "3600",
     upsert: false,
@@ -479,20 +519,27 @@ async function uploadImage(file, cardId) {
   return { image_url: data.publicUrl, image_path: imagePath };
 }
 
-async function createCard(event) {
+async function saveCard(event) {
   event.preventDefault();
   if (!state.user || !db) return;
 
+  const editingCard = state.cards.find((card) => card.id === state.editingCardId) || null;
   formError.textContent = "";
   saveCardButton.disabled = true;
-  saveCardButton.textContent = "Створюю...";
+  saveCardButton.textContent = editingCard ? "Зберігаю..." : "Створюю...";
 
   const formData = new FormData(cardForm);
-  const cardId = crypto.randomUUID();
+  const cardId = editingCard?.id || crypto.randomUUID();
   let uploadedPath = null;
 
   try {
-    const image = await uploadImage(imageInput.files[0], cardId);
+    const newImageFile = imageInput.files[0];
+    const image = newImageFile
+      ? await uploadImage(newImageFile, cardId, editingCard ? `-${Date.now()}` : "")
+      : {
+          image_url: editingCard?.image_url || null,
+          image_path: editingCard?.image_path || null,
+        };
     uploadedPath = image.image_path;
     const card = {
       id: cardId,
@@ -505,24 +552,42 @@ async function createCard(event) {
       category: formData.get("category").trim(),
       image_url: image.image_url,
       image_path: image.image_path,
-      color: palette[state.cards.length % palette.length],
+      color: editingCard?.color || palette[state.cards.length % palette.length],
     };
 
-    const { data, error } = await db.from("cards").insert(card).select().single();
+    const query = editingCard
+      ? db.from("cards").update(card).eq("id", cardId)
+      : db.from("cards").insert(card);
+    const { data, error } = await query.select().single();
     if (error) throw error;
 
-    state.cards.unshift(data);
+    if (editingCard) {
+      state.cards = state.cards.map((item) => (item.id === cardId ? data : item));
+      if (newImageFile && editingCard.image_path && editingCard.image_path !== image.image_path) {
+        const { error: imageError } = await db.storage
+          .from("card-images")
+          .remove([editingCard.image_path]);
+        if (imageError) console.error(imageError);
+      }
+    } else {
+      state.cards.unshift(data);
+    }
+
+    state.editingCardId = null;
     cardForm.reset();
+    imagePreview.removeAttribute("src");
     imagePreview.hidden = true;
     cardModal.close();
     render();
-    showToast("Картку створено");
+    showToast(editingCard ? "Зміни збережено" : "Картку створено");
   } catch (error) {
-    if (uploadedPath) await db.storage.from("card-images").remove([uploadedPath]);
-    formError.textContent = error.message || "Не вдалося створити картку";
+    const isNewUpload = uploadedPath && uploadedPath !== editingCard?.image_path;
+    if (isNewUpload) await db.storage.from("card-images").remove([uploadedPath]);
+    formError.textContent =
+      error.message || (editingCard ? "Не вдалося зберегти зміни" : "Не вдалося створити картку");
   } finally {
     saveCardButton.disabled = false;
-    saveCardButton.textContent = "Створити картку";
+    saveCardButton.textContent = editingCard ? "Зберегти зміни" : "Створити картку";
   }
 }
 
@@ -600,6 +665,8 @@ grid.addEventListener("click", async (event) => {
     await toggleCardValue(card, "is_favorite");
   } else if (actionButton.dataset.action === "learned") {
     await toggleCardValue(card, "is_learned");
+  } else if (actionButton.dataset.action === "edit") {
+    openEditModal(card);
   } else if (actionButton.dataset.action === "delete") {
     await deleteCard(card);
   }
@@ -633,10 +700,13 @@ profileButton.addEventListener("click", () => profileModal.showModal());
 document.querySelector("#sign-out-button").addEventListener("click", signOut);
 document.querySelector("#switch-account-button").addEventListener("click", switchAccount);
 document.querySelector("#add-account-button").addEventListener("click", addAccount);
-cardForm.addEventListener("submit", createCard);
+cardForm.addEventListener("submit", saveCard);
 
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
-  button.addEventListener("click", () => cardModal.close());
+  button.addEventListener("click", () => {
+    state.editingCardId = null;
+    cardModal.close();
+  });
 });
 document.querySelector("[data-close-profile]").addEventListener("click", () => profileModal.close());
 
