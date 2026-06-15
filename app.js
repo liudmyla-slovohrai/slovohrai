@@ -207,6 +207,12 @@ function renderCards() {
                 aria-label="Перевернути картку «${escapeHtml(card.ukrainian)}»"></button>
             </div>
             <div class="card-face card-back">
+              <button
+                class="delete-card-button"
+                data-action="delete"
+                aria-label="Видалити картку «${escapeHtml(card.ukrainian)}»"
+                title="Видалити картку"
+              >×</button>
               <div class="translations">
                 <div class="translation">
                   <span class="language">🇬🇧 Англійська</span>
@@ -537,6 +543,33 @@ async function toggleCardValue(card, field) {
   updateProgress();
 }
 
+async function deleteCard(card) {
+  if (!state.user || !db || card.id.startsWith("demo-")) {
+    showToast("Демонстраційну картку не можна видалити");
+    return;
+  }
+
+  const confirmed = confirm(`Точно видалити картку «${card.ukrainian}»?`);
+  if (!confirmed) return;
+
+  const { error } = await db.from("cards").delete().eq("id", card.id);
+  if (error) {
+    showToast("Не вдалося видалити картку");
+    return;
+  }
+
+  if (card.image_path) {
+    const { error: imageError } = await db.storage
+      .from("card-images")
+      .remove([card.image_path]);
+    if (imageError) console.error(imageError);
+  }
+
+  state.cards = state.cards.filter((item) => item.id !== card.id);
+  render();
+  showToast(`Картку «${card.ukrainian}» видалено`);
+}
+
 filters.addEventListener("click", (event) => {
   const button = event.target.closest("[data-category]");
   if (!button) return;
@@ -567,6 +600,8 @@ grid.addEventListener("click", async (event) => {
     await toggleCardValue(card, "is_favorite");
   } else if (actionButton.dataset.action === "learned") {
     await toggleCardValue(card, "is_learned");
+  } else if (actionButton.dataset.action === "delete") {
+    await deleteCard(card);
   }
 });
 
