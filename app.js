@@ -129,6 +129,30 @@ const quizAnswer = document.querySelector("#quiz-answer");
 const quizFeedback = document.querySelector("#quiz-feedback");
 let cardsLoadVersion = 0;
 
+const translationFallbacks = {
+  "книга": { english: "Book", spanish: "Libro" },
+  "яблуко": { english: "Apple", spanish: "Manzana" },
+  "дім": { english: "Home", spanish: "Casa" },
+  "кава": { english: "Coffee", spanish: "Café" },
+  "дякую": { english: "Thank you", spanish: "Gracias" },
+  "доброго ранку": { english: "Good morning", spanish: "Buenos días" },
+  "вода": { english: "Water", spanish: "Agua" },
+  "їжа": { english: "Food", spanish: "Comida" },
+  "чайник": { english: "Kettle", spanish: "Pava" },
+  "паспорт": { english: "Passport", spanish: "Pasaporte" },
+  "квиток": { english: "Ticket", spanish: "Boleto" },
+  "білет": { english: "Ticket", spanish: "Boleto" },
+  "автобус": { english: "Bus", spanish: "Autobús" },
+  "таксі": { english: "Taxi", spanish: "Taxi" },
+  "готель": { english: "Hotel", spanish: "Hotel" },
+  "аеропорт": { english: "Airport", spanish: "Aeropuerto" },
+  "документ": { english: "Document", spanish: "Documento" },
+  "де?": { english: "Where?", spanish: "¿Dónde?" },
+  "хто": { english: "Who?", spanish: "¿Quién?" },
+  "що?": { english: "What?", spanish: "¿Qué?" },
+  "скільки?": { english: "How much?", spanish: "¿Cuánto?" },
+};
+
 function escapeHtml(value) {
   const element = document.createElement("div");
   element.textContent = value ?? "";
@@ -140,6 +164,125 @@ function showToast(message) {
   toast.classList.add("show");
   clearTimeout(showToast.timeout);
   showToast.timeout = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+function normalizeLookup(value) {
+  return value.trim().toLocaleLowerCase("uk").replace(/\s+/g, " ");
+}
+
+function setAdvancedFieldsVisible(isVisible) {
+  document.querySelectorAll(".advanced-card-field").forEach((field) => {
+    field.hidden = !isVisible;
+    field.querySelectorAll("input").forEach((input) => {
+      if (input.type !== "file") input.required = isVisible;
+    });
+  });
+}
+
+function transliterateToUkrainianSounds(value, language) {
+  const phrase = value
+    .toLocaleLowerCase()
+    .replace(/[¿¡]/g, "")
+    .replace(/[.,!?]/g, "")
+    .trim();
+
+  const words = phrase.split(/\s+/).map((word) => {
+    let result = word;
+    const replacements = language === "english"
+      ? [
+          [/tion/g, "шн"], [/th/g, "с"], [/sh/g, "ш"], [/ch/g, "ч"], [/oo/g, "у"],
+          [/ee/g, "і"], [/ea/g, "і"], [/ou/g, "ау"], [/ow/g, "ау"], [/ai/g, "ей"],
+          [/ay/g, "ей"], [/ph/g, "ф"], [/ck/g, "к"], [/qu/g, "кв"], [/w/g, "в"],
+          [/y/g, "і"], [/j/g, "дж"], [/x/g, "кс"], [/a/g, "а"], [/b/g, "б"],
+          [/c/g, "к"], [/d/g, "д"], [/e/g, "е"], [/f/g, "ф"], [/g/g, "г"],
+          [/h/g, "х"], [/i/g, "і"], [/k/g, "к"], [/l/g, "л"], [/m/g, "м"],
+          [/n/g, "н"], [/o/g, "о"], [/p/g, "п"], [/q/g, "к"], [/r/g, "р"],
+          [/s/g, "с"], [/t/g, "т"], [/u/g, "у"], [/v/g, "в"], [/z/g, "з"],
+        ]
+      : [
+          [/ll/g, "й"], [/ñ/g, "нь"], [/ch/g, "ч"], [/qu/g, "к"], [/gue/g, "ге"],
+          [/gui/g, "гі"], [/j/g, "х"], [/ge/g, "хе"], [/gi/g, "хі"], [/ce/g, "се"],
+          [/ci/g, "сі"], [/z/g, "с"], [/v/g, "б"], [/y/g, "й"], [/a/g, "а"],
+          [/b/g, "б"], [/c/g, "к"], [/d/g, "д"], [/e/g, "е"], [/f/g, "ф"],
+          [/g/g, "г"], [/h/g, ""], [/i/g, "і"], [/k/g, "к"], [/l/g, "л"],
+          [/m/g, "м"], [/n/g, "н"], [/o/g, "о"], [/p/g, "п"], [/r/g, "р"],
+          [/s/g, "с"], [/t/g, "т"], [/u/g, "у"], [/x/g, "кс"],
+        ];
+    replacements.forEach(([pattern, replacement]) => {
+      result = result.replace(pattern, replacement);
+    });
+    return result;
+  });
+
+  return `[${words.join(" ")}]`;
+}
+
+async function translateWord(word, targetLanguage) {
+  const url = new URL("https://api.mymemory.translated.net/get");
+  url.searchParams.set("q", word);
+  url.searchParams.set("langpair", `uk|${targetLanguage}`);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) throw new Error("translation failed");
+  const data = await response.json();
+  const translatedText = data?.responseData?.translatedText?.trim();
+  if (!translatedText) throw new Error("empty translation");
+  return translatedText;
+}
+
+function createGeneratedImage(card) {
+  const accent = card.color || palette[0];
+  const safeUkrainian = escapeHtml(card.ukrainian);
+  const safeEnglish = escapeHtml(card.english);
+  const safeCategory = escapeHtml(card.category);
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640">
+      <defs>
+        <radialGradient id="glow" cx="28%" cy="22%" r="70%">
+          <stop offset="0%" stop-color="#fff7e8"/>
+          <stop offset="100%" stop-color="${accent}"/>
+        </radialGradient>
+      </defs>
+      <rect width="900" height="640" rx="48" fill="url(#glow)"/>
+      <circle cx="692" cy="144" r="90" fill="#ffffff" opacity=".38"/>
+      <circle cx="212" cy="470" r="135" fill="#ffffff" opacity=".28"/>
+      <text x="72" y="104" fill="#ef786a" font-family="Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="6">${safeCategory}</text>
+      <text x="72" y="330" fill="#123f3b" font-family="Arial, sans-serif" font-size="86" font-weight="800">${safeUkrainian}</text>
+      <text x="76" y="410" fill="#5f746f" font-family="Arial, sans-serif" font-size="44" font-weight="700">${safeEnglish}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+async function buildAutomaticCardFields(ukrainian, category, color) {
+  const fallback = translationFallbacks[normalizeLookup(ukrainian)] || null;
+  let english = fallback?.english;
+  let spanish = fallback?.spanish;
+
+  try {
+    english ||= await translateWord(ukrainian, "en");
+    spanish ||= await translateWord(ukrainian, "es");
+  } catch (error) {
+    if (!english || !spanish) {
+      throw new Error("Не вдалося автоматично перекласти слово. Спробуйте ще раз або відкрийте редагування після створення.");
+    }
+  }
+
+  const card = {
+    ukrainian,
+    category,
+    english,
+    spanish,
+    english_pronunciation: transliterateToUkrainianSounds(english, "english"),
+    spanish_pronunciation: transliterateToUkrainianSounds(spanish, "spanish"),
+    color,
+  };
+
+  return {
+    ...card,
+    image_url: createGeneratedImage(card),
+    image_path: null,
+  };
 }
 
 function cardLabel(count) {
@@ -494,13 +637,14 @@ function openCardModal() {
     return;
   }
   state.editingCardId = null;
+  setAdvancedFieldsVisible(false);
   cardForm.reset();
   imagePreview.removeAttribute("src");
   imagePreview.hidden = true;
   formError.textContent = "";
   document.querySelector("#card-modal-kicker").textContent = "НОВА КАРТКА";
   document.querySelector("#card-modal-title").textContent = "Додати слово";
-  saveCardButton.textContent = "Створити картку";
+  saveCardButton.textContent = "Створити автоматично";
   cardModal.showModal();
 }
 
@@ -508,6 +652,7 @@ function openEditModal(card) {
   if (!state.user || card.id.startsWith("demo-")) return;
 
   state.editingCardId = card.id;
+  setAdvancedFieldsVisible(true);
   cardForm.reset();
   cardForm.elements.ukrainian.value = card.ukrainian || "";
   cardForm.elements.english.value = card.english || "";
@@ -555,33 +700,51 @@ async function saveCard(event) {
   const editingCard = state.cards.find((card) => card.id === state.editingCardId) || null;
   formError.textContent = "";
   saveCardButton.disabled = true;
-  saveCardButton.textContent = editingCard ? "Зберігаю..." : "Створюю...";
+  saveCardButton.textContent = editingCard ? "Зберігаю..." : "Дороблюю картку...";
 
   const formData = new FormData(cardForm);
   const cardId = editingCard?.id || crypto.randomUUID();
+  const ukrainian = formData.get("ukrainian").trim();
+  const category = formData.get("category").trim();
   let uploadedPath = null;
 
   try {
-    const newImageFile = imageInput.files[0];
-    const image = newImageFile
-      ? await uploadImage(newImageFile, cardId, editingCard ? `-${Date.now()}` : "")
+    const newImageFile = editingCard ? imageInput.files[0] : null;
+    const autoFields = editingCard
+      ? null
+      : await buildAutomaticCardFields(
+          ukrainian,
+          category,
+          palette[state.cards.length % palette.length],
+        );
+    const image = editingCard
+      ? newImageFile
+        ? await uploadImage(newImageFile, cardId, `-${Date.now()}`)
+        : {
+            image_url: editingCard.image_url || null,
+            image_path: editingCard.image_path || null,
+          }
       : {
-          image_url: editingCard?.image_url || null,
-          image_path: editingCard?.image_path || null,
+          image_url: autoFields.image_url,
+          image_path: autoFields.image_path,
         };
     uploadedPath = image.image_path;
     const card = {
       id: cardId,
       user_id: state.user.id,
-      ukrainian: formData.get("ukrainian").trim(),
-      english: formData.get("english").trim(),
-      english_pronunciation: formData.get("english_pronunciation").trim(),
-      spanish: formData.get("spanish").trim(),
-      spanish_pronunciation: formData.get("spanish_pronunciation").trim(),
-      category: formData.get("category").trim(),
+      ukrainian,
+      english: editingCard ? formData.get("english").trim() : autoFields.english,
+      english_pronunciation: editingCard
+        ? formData.get("english_pronunciation").trim()
+        : autoFields.english_pronunciation,
+      spanish: editingCard ? formData.get("spanish").trim() : autoFields.spanish,
+      spanish_pronunciation: editingCard
+        ? formData.get("spanish_pronunciation").trim()
+        : autoFields.spanish_pronunciation,
+      category,
       image_url: image.image_url,
       image_path: image.image_path,
-      color: editingCard?.color || palette[state.cards.length % palette.length],
+      color: editingCard?.color || autoFields.color,
     };
 
     const query = editingCard
@@ -616,7 +779,7 @@ async function saveCard(event) {
       error.message || (editingCard ? "Не вдалося зберегти зміни" : "Не вдалося створити картку");
   } finally {
     saveCardButton.disabled = false;
-    saveCardButton.textContent = editingCard ? "Зберегти зміни" : "Створити картку";
+    saveCardButton.textContent = editingCard ? "Зберегти зміни" : "Створити автоматично";
   }
 }
 
