@@ -123,6 +123,8 @@ const saveCardButton = document.querySelector("#save-card-button");
 const librarySection = document.querySelector(".library");
 const welcomeSection = document.querySelector(".welcome");
 const quizPage = document.querySelector("#quiz-page");
+const quizOptions = document.querySelector("#quiz-options");
+const quizShell = document.querySelector("#quiz-shell");
 const quizLaunchButton = document.querySelector("#quiz-launch-button");
 const quizForm = document.querySelector("#quiz-form");
 const quizAnswer = document.querySelector("#quiz-answer");
@@ -590,10 +592,9 @@ function renderCards() {
 }
 
 function updateQuizButton() {
-  const learnedCount = state.cards.filter((card) => card.is_learned).length;
-  quizLaunchButton.hidden = state.view !== "learned";
-  quizLaunchButton.disabled = learnedCount === 0;
-  quizLaunchButton.title = learnedCount ? "" : "Спочатку позначте хоча б одну картку вивченою";
+  quizLaunchButton.hidden = false;
+  quizLaunchButton.disabled = false;
+  quizLaunchButton.title = "";
 }
 
 function updateProgress() {
@@ -642,6 +643,17 @@ function closeQuiz() {
   location.reload();
 }
 
+function openQuizMenu() {
+  welcomeSection.hidden = true;
+  librarySection.hidden = true;
+  quizPage.hidden = false;
+  quizOptions.hidden = false;
+  quizShell.hidden = true;
+  document.querySelector("#quiz-progress").textContent = "РћР±РµСЂС–С‚СЊ СЂРµР¶РёРј";
+  document.querySelector(".mobile-nav").hidden = true;
+  scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function renderQuizQuestion() {
   const card = state.quiz.cards[state.quiz.index];
   if (!card) {
@@ -687,6 +699,8 @@ function startQuiz() {
   welcomeSection.hidden = true;
   librarySection.hidden = true;
   quizPage.hidden = false;
+  quizOptions.hidden = true;
+  quizShell.hidden = false;
   document.querySelector(".mobile-nav").hidden = true;
   scrollTo({ top: 0, behavior: "smooth" });
   renderQuizQuestion();
@@ -1090,8 +1104,19 @@ document.querySelectorAll("[data-view]").forEach((button) => {
   });
 });
 
-quizLaunchButton.addEventListener("click", startQuiz);
+quizLaunchButton.addEventListener("click", openQuizMenu);
 document.querySelector("#quiz-back-button").addEventListener("click", closeQuiz);
+quizOptions.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-quiz-option]");
+  if (!button) return;
+
+  if (button.dataset.quizOption === "learned") {
+    startQuiz();
+    return;
+  }
+
+  showToast("РЎСЋРґРё РґРѕРґР°РјРѕ С‚РІС–Р№ С‚РµРєСЃС‚ С‚СЂРѕС…Рё РїС–Р·РЅС–С€Рµ");
+});
 quizForm.addEventListener("submit", checkQuizAnswer);
 document.querySelector(".quiz-language-switch").addEventListener("click", (event) => {
   const button = event.target.closest("[data-quiz-language]");
@@ -1225,3 +1250,4 @@ async function initialize() {
 }
 
 initialize();
+
