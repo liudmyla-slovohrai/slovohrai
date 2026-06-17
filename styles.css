@@ -868,6 +868,167 @@ h2 {
   margin-top: auto;
 }
 
+.swipe-quiz {
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+
+.swipe-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 auto 20px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.swipe-stack {
+  position: relative;
+  width: min(360px, 82vw);
+  height: min(500px, 66vh);
+  min-height: 430px;
+  margin: 0 auto;
+  perspective: 900px;
+}
+
+.swipe-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 82% 12%, rgb(239 120 106 / 18%), transparent 9rem),
+    var(--surface-raised);
+  box-shadow: 0 22px 55px rgb(24 52 47 / 16%);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transform: translateY(var(--stack-offset)) rotate(var(--stack-rotate)) scale(var(--stack-scale));
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.swipe-card.is-dragging {
+  cursor: grabbing;
+  transition: none;
+  box-shadow: 0 28px 70px rgb(24 52 47 / 22%);
+}
+
+.swipe-card.swiping-known {
+  border-color: rgb(23 96 60 / 45%);
+}
+
+.swipe-card.swiping-unknown {
+  border-color: rgb(165 62 52 / 45%);
+}
+
+.swipe-card.fly-right {
+  transform: translateX(520px) rotate(24deg);
+}
+
+.swipe-card.fly-left {
+  transform: translateX(-520px) rotate(-24deg);
+}
+
+.swipe-card-image {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0.92;
+}
+
+.swipe-card-image::after {
+  content: "";
+  position: absolute;
+  inset: 45% 0 0;
+  background: linear-gradient(transparent, var(--surface-raised));
+}
+
+.swipe-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.swipe-card .card-emoji {
+  font-size: 94px;
+}
+
+.swipe-card span,
+.swipe-card h3,
+.swipe-card p {
+  position: relative;
+  z-index: 1;
+}
+
+.swipe-card span {
+  color: var(--coral-dark);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.swipe-card h3 {
+  margin: 8px 0;
+  font-size: clamp(36px, 8vw, 54px);
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.swipe-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.swipe-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: min(360px, 82vw);
+  margin: 22px auto 0;
+}
+
+.swipe-action-unknown {
+  border-color: #f0b2ad;
+  color: #a53e34;
+}
+
+.swipe-action-known {
+  background: var(--teal);
+}
+
+.swipe-result {
+  display: grid;
+  min-height: 100%;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 30px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+  text-align: center;
+  place-content: center;
+}
+
+.swipe-result h3 {
+  margin: 0;
+  font-size: 44px;
+}
+
+.swipe-result p:not(.section-kicker) {
+  color: var(--muted);
+}
+
 .quiz-heading {
   margin-bottom: 26px;
   text-align: center;
@@ -1432,6 +1593,21 @@ h2 {
   .quiz-plan-card {
     min-height: 280px;
     padding: 22px;
+  }
+
+  .swipe-status {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .swipe-stack {
+    width: min(330px, 88vw);
+    min-height: 390px;
+  }
+
+  .swipe-actions {
+    width: min(330px, 88vw);
   }
 
   .quiz-form {
