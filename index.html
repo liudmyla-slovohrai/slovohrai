@@ -15,10 +15,10 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=12" />
+    <link rel="stylesheet" href="styles.css?v=13" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=16" defer></script>
+    <script src="app.js?v=17" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -132,9 +132,9 @@
 
             <article class="quiz-plan-card">
               <p class="quiz-plan-kicker">Quiz 2</p>
-              <h3>Скоро</h3>
-              <p>Тут буде текст, який ти додаси трохи пізніше.</p>
-              <button class="secondary-button" type="button" data-quiz-option="soon">Додамо пізніше</button>
+              <h3>Вивчені слова</h3>
+              <p>Такий самий Quiz, але тільки з твоїх вивчених карток.</p>
+              <button class="secondary-button" type="button" data-quiz-option="learned-stack">Почати</button>
             </article>
 
             <article class="quiz-plan-card">
@@ -147,10 +147,11 @@
         </div>
 
         <div class="swipe-quiz" id="swipe-quiz" hidden>
+          <button class="quiz-exit-button" type="button" id="swipe-exit-button">← Вийти</button>
           <div class="quiz-heading">
-            <p class="section-kicker">НЕВИВЧЕНІ КАРТКИ</p>
-            <h2>Перевір себе свайпом</h2>
-            <p>Потягни картку вліво, якщо ще не знаєш, або вправо, якщо вже знаєш.</p>
+            <p class="section-kicker" id="swipe-kicker">НЕВИВЧЕНІ КАРТКИ</p>
+            <h2 id="swipe-title">Перевір себе свайпом</h2>
+            <p id="swipe-description">Потягни картку вліво, якщо ще не знаєш, або вправо, якщо вже знаєш. Натисни на картку, щоб подивитися відповідь.</p>
           </div>
 
           <div class="swipe-status">
