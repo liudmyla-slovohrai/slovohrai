@@ -103,6 +103,7 @@ const state = {
   },
   swipeQuiz: {
     cards: [],
+    mode: "unlearned",
     known: 0,
     unknown: 0,
     isAnimating: false,
@@ -702,10 +703,23 @@ function renderSwipeStack() {
           data-id="${escapeHtml(card.id)}"
           style="--stack-offset:${offset}px; --stack-rotate:${rotation}deg; --stack-scale:${1 - index * 0.04}; z-index:${20 - index};"
         >
-          <div class="swipe-card-image">${image}</div>
-          <span>${escapeHtml(card.category)}</span>
-          <h3>${escapeHtml(card.ukrainian)}</h3>
-          <p>Свайпни вправо, якщо знаєш. Вліво, якщо ще треба повторити.</p>
+          <div class="swipe-card-inner">
+            <div class="swipe-card-face swipe-card-front">
+              <div class="swipe-card-image">${image}</div>
+              <span>${escapeHtml(card.category)}</span>
+              <h3>${escapeHtml(card.ukrainian)}</h3>
+              <p>Натисни, щоб перевірити переклад. Вправо — знаю, вліво — не знаю.</p>
+            </div>
+            <div class="swipe-card-face swipe-card-back">
+              <span>Відповідь</span>
+              <h3>${escapeHtml(card.ukrainian)}</h3>
+              <div class="swipe-answer-list">
+                <p><strong>English:</strong> ${escapeHtml(card.english)} <small>${escapeHtml(card.english_pronunciation || "")}</small></p>
+                <p><strong>Español:</strong> ${escapeHtml(card.spanish)} <small>${escapeHtml(card.spanish_pronunciation || "")}</small></p>
+              </div>
+              <p>Тепер обери: знаєш це слово чи треба повторити.</p>
+            </div>
+          </div>
         </article>
       `;
     })
@@ -720,7 +734,7 @@ async function markSwipeCard(card, isKnown) {
 
   if (isKnown) {
     state.swipeQuiz.known += 1;
-    if (!card.is_learned && !card.id.startsWith("demo-") && db && state.user) {
+    if (state.swipeQuiz.mode === "unlearned" && !card.is_learned && !card.id.startsWith("demo-") && db && state.user) {
       const { error } = await db.from("cards").update({ is_learned: true }).eq("id", card.id);
       if (error) {
         state.swipeQuiz.known -= 1;
@@ -732,6 +746,16 @@ async function markSwipeCard(card, isKnown) {
     }
   } else {
     state.swipeQuiz.unknown += 1;
+    if (state.swipeQuiz.mode === "learned" && card.is_learned && !card.id.startsWith("demo-") && db && state.user) {
+      const { error } = await db.from("cards").update({ is_learned: false }).eq("id", card.id);
+      if (error) {
+        state.swipeQuiz.unknown -= 1;
+        state.swipeQuiz.isAnimating = false;
+        showToast("Не вдалося повернути картку в невивчені");
+        return;
+      }
+      card.is_learned = false;
+    }
   }
 
   state.swipeQuiz.cards.shift();
@@ -749,6 +773,7 @@ function setupSwipeCard() {
   let currentX = 0;
   let currentY = 0;
   let dragging = false;
+  let hasMoved = false;
 
   const moveCard = () => {
     const rotate = currentX / 16;
@@ -759,6 +784,7 @@ function setupSwipeCard() {
 
   topCard.addEventListener("pointerdown", (event) => {
     dragging = true;
+    hasMoved = false;
     startX = event.clientX;
     startY = event.clientY;
     topCard.setPointerCapture(event.pointerId);
@@ -769,6 +795,7 @@ function setupSwipeCard() {
     if (!dragging) return;
     currentX = event.clientX - startX;
     currentY = event.clientY - startY;
+    if (Math.abs(currentX) > 8 || Math.abs(currentY) > 8) hasMoved = true;
     moveCard();
   });
 
@@ -776,6 +803,15 @@ function setupSwipeCard() {
     if (!dragging) return;
     dragging = false;
     topCard.classList.remove("is-dragging");
+
+    if (!hasMoved) {
+      topCard.classList.toggle("is-flipped");
+      currentX = 0;
+      currentY = 0;
+      topCard.style.transform = "";
+      topCard.classList.remove("swiping-known", "swiping-unknown");
+      return;
+    }
 
     if (currentX > 120) {
       topCard.classList.add("fly-right");
@@ -796,21 +832,28 @@ function setupSwipeCard() {
   });
 }
 
-function openSwipeQuiz() {
-  const unlearnedCards = state.cards.filter((card) => !card.is_learned);
-  if (!unlearnedCards.length) {
-    showToast("Усі картки вже вивчені");
+function openSwipeQuiz(mode = "unlearned") {
+  const isLearnedMode = mode === "learned";
+  const quizCards = state.cards.filter((card) => (isLearnedMode ? card.is_learned : !card.is_learned));
+  if (!quizCards.length) {
+    showToast(isLearnedMode ? "Поки немає вивчених карток" : "Усі картки вже вивчені");
     return;
   }
 
-  state.swipeQuiz.cards = shuffleCards(unlearnedCards);
+  state.swipeQuiz.cards = shuffleCards(quizCards);
+  state.swipeQuiz.mode = mode;
   state.swipeQuiz.known = 0;
   state.swipeQuiz.unknown = 0;
   state.swipeQuiz.isAnimating = false;
   quizOptions.hidden = true;
   quizShell.hidden = true;
   swipeQuiz.hidden = false;
-  document.querySelector("#quiz-progress").textContent = "Свайп Quiz";
+  document.querySelector("#swipe-kicker").textContent = isLearnedMode ? "ВИВЧЕНІ КАРТКИ" : "НЕВИВЧЕНІ КАРТКИ";
+  document.querySelector("#swipe-title").textContent = isLearnedMode ? "Перевір вивчені слова" : "Перевір себе свайпом";
+  document.querySelector("#swipe-description").textContent = isLearnedMode
+    ? "Переверни картку, перевір відповідь. Вправо — знаю, вліво — повернути в невивчені."
+    : "Потягни картку вліво, якщо ще не знаєш, або вправо, якщо вже знаєш. Натисни на картку, щоб подивитися відповідь.";
+  document.querySelector("#quiz-progress").textContent = isLearnedMode ? "Quiz 2" : "Quiz 1";
   renderSwipeStack();
 }
 
@@ -1271,12 +1314,18 @@ quizOptions.addEventListener("click", (event) => {
   if (!button) return;
 
   if (button.dataset.quizOption === "learned") {
-    openSwipeQuiz();
+    openSwipeQuiz("unlearned");
+    return;
+  }
+
+  if (button.dataset.quizOption === "learned-stack") {
+    openSwipeQuiz("learned");
     return;
   }
 
   showToast("Сюди додамо твій текст трохи пізніше");
 });
+document.querySelector("#swipe-exit-button").addEventListener("click", closeQuiz);
 document.querySelector(".swipe-actions").addEventListener("click", async (event) => {
   const button = event.target.closest("[data-swipe-action]");
   const card = state.swipeQuiz.cards[0];
