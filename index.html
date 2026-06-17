@@ -15,10 +15,10 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=11" />
+    <link rel="stylesheet" href="styles.css?v=12" />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
-    <script src="app.js?v=15" defer></script>
+    <script src="app.js?v=16" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -143,6 +143,27 @@
               <p>Це місце для ще одного варіанта тренування.</p>
               <button class="secondary-button" type="button" data-quiz-option="soon">Додамо пізніше</button>
             </article>
+          </div>
+        </div>
+
+        <div class="swipe-quiz" id="swipe-quiz" hidden>
+          <div class="quiz-heading">
+            <p class="section-kicker">НЕВИВЧЕНІ КАРТКИ</p>
+            <h2>Перевір себе свайпом</h2>
+            <p>Потягни картку вліво, якщо ще не знаєш, або вправо, якщо вже знаєш.</p>
+          </div>
+
+          <div class="swipe-status">
+            <span id="swipe-left-count">Не знаю: 0</span>
+            <span id="swipe-progress">0 / 0</span>
+            <span id="swipe-right-count">Знаю: 0</span>
+          </div>
+
+          <div class="swipe-stack" id="swipe-stack" aria-live="polite"></div>
+
+          <div class="swipe-actions">
+            <button class="secondary-button swipe-action-unknown" type="button" data-swipe-action="unknown">Не знаю</button>
+            <button class="primary-button swipe-action-known" type="button" data-swipe-action="known">Знаю</button>
           </div>
         </div>
 
