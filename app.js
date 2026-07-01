@@ -114,6 +114,7 @@ const state = {
     isAnimating: false,
   },
   editingCardId: null,
+  cardDraftVisibility: "public",
 };
 
 const grid = document.querySelector("#cards-grid");
@@ -124,6 +125,7 @@ const emptyState = document.querySelector("#empty-state");
 const toast = document.querySelector("#toast");
 const authButton = document.querySelector("#auth-button");
 const profileButton = document.querySelector("#profile-button");
+const addPrivateCardButton = document.querySelector("#add-private-card-button");
 const cardModal = document.querySelector("#card-modal");
 const profileModal = document.querySelector("#profile-modal");
 const cardForm = document.querySelector("#card-form");
@@ -201,6 +203,10 @@ function isDemoCard(card) {
 
 function isOwnCard(card) {
   return Boolean(state.user?.id && card.user_id === state.user.id);
+}
+
+function isSharedCard(card) {
+  return isDemoCard(card) || Boolean(card.is_public);
 }
 
 function canManageCard(card) {
@@ -507,8 +513,15 @@ function cardLabel(count) {
   return "карток";
 }
 
+function getCardsForCurrentView() {
+  if (state.view === "mine") return state.cards.filter((card) => isOwnCard(card));
+  if (state.view === "favorites") return state.cards.filter((card) => card.is_favorite);
+  if (state.view === "learned") return state.cards.filter((card) => card.is_learned);
+  return state.cards.filter((card) => isSharedCard(card));
+}
+
 function renderFilters() {
-  const categories = ["Усі", ...new Set(state.cards.map((card) => card.category))];
+  const categories = ["Усі", ...new Set(getCardsForCurrentView().map((card) => card.category))];
   if (!categories.includes(state.category)) state.category = "Усі";
   filters.innerHTML = categories
     .map(
@@ -522,16 +535,12 @@ function renderFilters() {
 
 function getVisibleCards() {
   const query = state.query.toLocaleLowerCase("uk");
-  return state.cards.filter((card) => {
+  return getCardsForCurrentView().filter((card) => {
     const matchesCategory = state.category === "Усі" || card.category === state.category;
     const searchable = [card.ukrainian, card.english, card.spanish, card.category]
       .join(" ")
       .toLocaleLowerCase("uk");
-    const matchesView =
-      state.view === "all" ||
-      (state.view === "favorites" && card.is_favorite) ||
-      (state.view === "learned" && card.is_learned);
-    return matchesCategory && searchable.includes(query) && matchesView;
+    return matchesCategory && searchable.includes(query);
   });
 }
 
@@ -638,6 +647,22 @@ function updateQuizButton() {
   quizLaunchButton.title = "";
 }
 
+function updateLibraryHeading() {
+  const titles = {
+    all: "Усі картки",
+    mine: "Мої картки",
+    favorites: "Улюблені",
+    learned: "Вивчені",
+  };
+  document.querySelector("#library-title").textContent = titles[state.view] || titles.all;
+}
+
+function updateNavigation() {
+  document.querySelectorAll("[data-view]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.view === state.view);
+  });
+}
+
 function updateProgress() {
   const learned = state.cards.filter((card) => card.is_learned).length;
   const percent = state.cards.length ? Math.round((learned / state.cards.length) * 100) : 0;
@@ -650,6 +675,8 @@ function updateProgress() {
 }
 
 function render() {
+  updateNavigation();
+  updateLibraryHeading();
   renderFilters();
   renderCards();
   updateProgress();
@@ -965,6 +992,7 @@ function renderUser() {
   const metadata = state.user?.user_metadata || {};
   authButton.hidden = Boolean(state.user);
   profileButton.hidden = !state.user;
+  addPrivateCardButton.hidden = !isCurrentUserAdmin();
   if (!state.user) return;
 
   const name = metadata.full_name || metadata.name || state.user.email || "Користувач";
@@ -1077,20 +1105,23 @@ async function signOut() {
   profileModal.close();
 }
 
-function openCardModal() {
+function openCardModal({ visibility = "public" } = {}) {
   if (!state.user) {
     showToast(isConfigured ? "Увійдіть через Google, щоб створити картку" : "Спочатку підключіть Supabase");
     if (isConfigured) signIn();
     return;
   }
   state.editingCardId = null;
+  state.cardDraftVisibility = visibility;
   setAdvancedFieldsVisible(false);
   cardForm.reset();
   imagePreview.removeAttribute("src");
   imagePreview.hidden = true;
   formError.textContent = "";
-  document.querySelector("#card-modal-kicker").textContent = "НОВА КАРТКА";
-  document.querySelector("#card-modal-title").textContent = "Додати слово";
+  document.querySelector("#card-modal-kicker").textContent =
+    visibility === "private" ? "ОСОБИСТА КАРТКА" : "НОВА КАРТКА";
+  document.querySelector("#card-modal-title").textContent =
+    visibility === "private" ? "Додати для себе" : "Додати слово";
   saveCardButton.textContent = "Створити автоматично";
   cardModal.showModal();
 }
@@ -1099,6 +1130,7 @@ function openEditModal(card) {
   if (!state.user || !canManageCard(card)) return;
 
   state.editingCardId = card.id;
+  state.cardDraftVisibility = "public";
   setAdvancedFieldsVisible(true);
   cardForm.reset();
   cardForm.elements.ukrainian.value = card.ukrainian || "";
@@ -1194,7 +1226,9 @@ async function saveCard(event) {
       image_url: image.image_url,
       image_path: image.image_path,
       color: editingCard?.color || autoFields.color,
-      is_public: editingCard ? Boolean(editingCard.is_public) : isCurrentUserAdmin(),
+      is_public: editingCard
+        ? Boolean(editingCard.is_public)
+        : isCurrentUserAdmin() && state.cardDraftVisibility !== "private",
     };
 
     const query = editingCard
@@ -1225,9 +1259,12 @@ async function saveCard(event) {
         is_favorite: false,
         is_learned: false,
       });
+      state.view = data.is_public ? "all" : "mine";
+      state.category = "Усі";
     }
 
     state.editingCardId = null;
+    state.cardDraftVisibility = "public";
     cardForm.reset();
     imagePreview.removeAttribute("src");
     imagePreview.hidden = true;
@@ -1385,11 +1422,8 @@ grid.addEventListener("click", async (event) => {
 document.querySelectorAll("[data-view]").forEach((button) => {
   button.addEventListener("click", () => {
     state.view = button.dataset.view;
-    document.querySelectorAll("[data-view]").forEach((item) => {
-      item.classList.toggle("active", item.dataset.view === state.view);
-    });
-    renderCards();
-    updateQuizButton();
+    state.category = "Усі";
+    render();
   });
 });
 
@@ -1427,7 +1461,8 @@ document.querySelector(".quiz-language-switch").addEventListener("click", (event
   quizAnswer.focus();
 });
 
-document.querySelector("#add-card-button").addEventListener("click", openCardModal);
+document.querySelector("#add-card-button").addEventListener("click", () => openCardModal());
+addPrivateCardButton.addEventListener("click", () => openCardModal({ visibility: "private" }));
 authButton.addEventListener("click", signIn);
 profileButton.addEventListener("click", () => profileModal.showModal());
 document.querySelector("#sign-out-button").addEventListener("click", signOut);
@@ -1438,6 +1473,7 @@ cardForm.addEventListener("submit", saveCard);
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", () => {
     state.editingCardId = null;
+    state.cardDraftVisibility = "public";
     cardModal.close();
   });
 });
