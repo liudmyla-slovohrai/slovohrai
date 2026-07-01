@@ -12,7 +12,8 @@ as $$
     array[
       'dobjanskiy51@gmail.com',
       'lyudmiladobshanska@gmail.com',
-      'petrostanislav@gmail.com'
+      'petrostanislav@gmail.com',
+      'dobzhansky.igor@gmail.com'
     ]
   );
 $$;
@@ -32,7 +33,8 @@ where cards.user_id = users.id
     array[
       'dobjanskiy51@gmail.com',
       'lyudmiladobshanska@gmail.com',
-      'petrostanislav@gmail.com'
+      'petrostanislav@gmail.com',
+      'dobzhansky.igor@gmail.com'
     ]
   );
 

@@ -84,6 +84,7 @@ const ADMIN_EMAILS = [
   "dobjanskiy51@gmail.com",
   "lyudmiladobshanska@gmail.com",
   "petrostanislav@gmail.com",
+  "dobzhansky.igor@gmail.com",
 ];
 const config = window.SUPABASE_CONFIG || {};
 const isConfigured =
